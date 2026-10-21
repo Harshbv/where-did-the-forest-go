@@ -17,9 +17,11 @@ BBOX = (-63.5, -10.0, -63.0, -9.5)
 CRS = "EPSG:32720"
 
 # Dry season = fewest clouds over the Amazon.
+# "before" must be 2021: that's the year of our WorldCover training labels.
+# "after" is the latest complete dry season.
 DATES = {
     "before": "2021-06-01/2021-09-30",
-    "after": "2024-06-01/2024-09-30",
+    "after": "2026-06-01/2026-09-30",
 }
 
 # Planetary Computer STAC catalog
