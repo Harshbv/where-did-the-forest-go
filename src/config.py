@@ -16,12 +16,14 @@ BBOX = (-63.5, -10.0, -63.0, -9.5)
 # makes every pixel exactly 10 m x 10 m, so areas in hectares are easy.
 CRS = "EPSG:32720"
 
-# Dry season = fewest clouds over the Amazon.
+# Peak dry season = fewest clouds over the Amazon.
 # "before" must be 2021: that's the year of our WorldCover training labels.
 # "after" is the latest complete dry season.
+# Both use the SAME months: pasture is green in June and brown by August, so
+# comparing a June image with an August one would "detect" seasons, not clearing.
 DATES = {
-    "before": "2021-06-01/2021-09-30",
-    "after": "2026-06-01/2026-09-30",
+    "before": "2021-07-01/2021-08-31",
+    "after": "2026-07-01/2026-08-31",
 }
 
 # Planetary Computer STAC catalog
