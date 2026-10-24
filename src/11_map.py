@@ -35,11 +35,13 @@ def data_url(rgba, fmt):
     return f"data:image/{fmt.lower()};base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def false_color_url(path):
+def natural_color_url(path):
+    # Natural color (red, green, blue bands): forest dark green, pasture tan. Not false
+    # color: there forest is red, and our red "cleared" patches would vanish on top of it.
     x, bounds = to_latlon(path, Resampling.average)
     x = x.astype("float32")
-    rgb = np.clip(np.dstack([x[3] / 4500, x[2] / 3000, x[1] / 3000]) * 255, 0, 255).astype("uint8")
-    return data_url(rgb, "JPEG"), bounds
+    rgb = np.clip(np.dstack([x[2], x[1], x[0]]) / 1800, 0, 1) ** (1 / 1.6)  # gamma brightens dark forest
+    return data_url((rgb * 255).astype("uint8"), "JPEG"), bounds
 
 
 def mask_url(mask, color):
@@ -48,8 +50,8 @@ def mask_url(mask, color):
     return data_url(rgba, "PNG")
 
 
-img21, bounds = false_color_url(DATA_DIR / "composite_before.tif")
-img26, _ = false_color_url(DATA_DIR / "composite_after_norm.tif")
+img21, bounds = natural_color_url(DATA_DIR / "composite_before.tif")
+img26, _ = natural_color_url(DATA_DIR / "composite_after_norm.tif")
 change, _ = to_latlon(DATA_DIR / "change_unet.tif", Resampling.nearest)
 hansen = rioxarray.open_rasterio(DATA_DIR / "hansen_lossyear.tif").values[0]
 hansen_bounds = rioxarray.open_rasterio(DATA_DIR / "hansen_lossyear.tif").rio.bounds()
@@ -62,11 +64,14 @@ m = folium.Map(location=center, zoom_start=11, tiles=None, control_scale=True)
 folium.TileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attr="Esri World Imagery", name="Satellite basemap (Esri)").add_to(m)
-folium.TileLayer("OpenStreetMap", name="Street map").add_to(m)
+# Esri's street map, not OpenStreetMap: OSM blocks tiles for pages opened as local files.
+folium.TileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    attr="Esri World Street Map", name="Street map (Esri)", show=False).add_to(m)
 
-folium.raster_layers.ImageOverlay(img21, bounds, name="Sentinel-2 Jul-Aug 2021 (false color)",
+folium.raster_layers.ImageOverlay(img21, bounds, name="Sentinel-2 Jul-Aug 2021",
                                   show=False).add_to(m)
-folium.raster_layers.ImageOverlay(img26, bounds, name="Sentinel-2 Jul-Aug 2026 (false color)",
+folium.raster_layers.ImageOverlay(img26, bounds, name="Sentinel-2 Jul-Aug 2026",
                                   show=True).add_to(m)
 folium.raster_layers.ImageOverlay(mask_url(change[0] == 2, (40, 110, 230, 200)), bounds,
                                   name="Regrowth 2021-2026 (blue)", show=False).add_to(m)
