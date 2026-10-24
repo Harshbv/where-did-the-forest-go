@@ -1,0 +1,13 @@
+dask==2026.8.0
+folium==0.20.0
+geopandas==1.2.0
+matplotlib==3.11.2
+numpy==2.5.4
+odc-stac==0.5.3
+pillow==13.0.0
+planetary-computer==1.0.0
+pystac-client==0.9.1
+rasterio==1.5.2
+rioxarray==0.23.0
+scipy==1.18.1
+torch==2.14.1
