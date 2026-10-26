@@ -1,7 +1,8 @@
 """Phase 3e: interactive web map of the results (a single self-contained HTML file).
 
+Shows the v3 map (U-Net trained on MapBiomas labels), the most accurate version.
 Layers you can toggle: 2021 image, 2026 image, cleared patches (click for details),
-regrowth, Hansen loss 2022-2025 for comparison.
+Hansen loss 2022-2025 for comparison. No regrowth layer: hand checks showed it isn't reliable.
 
 Run:  .venv/Scripts/python src/11_map.py
 Makes: outputs/deforestation_map.html   (open in any browser, no server needed)
@@ -52,11 +53,10 @@ def mask_url(mask, color):
 
 img21, bounds = natural_color_url(DATA_DIR / "composite_before.tif")
 img26, _ = natural_color_url(DATA_DIR / "composite_after_norm.tif")
-change, _ = to_latlon(DATA_DIR / "change_unet.tif", Resampling.nearest)
 hansen = rioxarray.open_rasterio(DATA_DIR / "hansen_lossyear.tif").values[0]
 hansen_bounds = rioxarray.open_rasterio(DATA_DIR / "hansen_lossyear.tif").rio.bounds()
 
-patches = json.load(open(OUT_DIR / "loss_patches.geojson"))
+patches = json.load(open(OUT_DIR / "loss_patches_v3.geojson"))
 total_ha = sum(f["properties"]["area_ha"] for f in patches["features"])
 center = [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2]
 
@@ -73,8 +73,6 @@ folium.raster_layers.ImageOverlay(img21, bounds, name="Sentinel-2 Jul-Aug 2021",
                                   show=False).add_to(m)
 folium.raster_layers.ImageOverlay(img26, bounds, name="Sentinel-2 Jul-Aug 2026",
                                   show=True).add_to(m)
-folium.raster_layers.ImageOverlay(mask_url(change[0] == 2, (40, 110, 230, 200)), bounds,
-                                  name="Regrowth 2021-2026 (blue)", show=False).add_to(m)
 folium.raster_layers.ImageOverlay(
     mask_url((hansen >= 22) & (hansen <= 25), (255, 200, 0, 190)),
     [[hansen_bounds[1], hansen_bounds[0]], [hansen_bounds[3], hansen_bounds[2]]],
@@ -96,8 +94,10 @@ m.get_root().html.add_child(folium.Element(f"""
             font:13px/1.45 system-ui, sans-serif; box-shadow:0 1px 6px rgba(0,0,0,0.3)">
   <b style="font-size:15px">Deforestation in Rondônia, Brazil, 2021 → 2026</b><br>
   <span style="color:#d00"><b>{total_ha:,.0f} ha</b></span> of forest cleared in
-  {len(patches['features']):,} patches (≥ 0.5 ha), about 7% of the 2021 forest.<br>
-  Sentinel-2 Jul–Aug composites · U-Net forest segmentation (test IoU 0.91)<br>
+  {len(patches['features']):,} patches (≥ 0.5 ha), about 6.5% of the 2021 forest.<br>
+  Checked by hand on 300 random points: 88% of flagged patches really were cleared,
+  92% overall accuracy.<br>
+  Sentinel-2 Jul–Aug composites · U-Net trained on MapBiomas labels<br>
   <span style="color:#666">Click a red patch for details. Toggle layers top right.</span>
 </div>"""))
 

@@ -6,19 +6,17 @@ Makes: outputs/12_before_after.png
 import matplotlib.pyplot as plt
 import numpy as np
 import rioxarray
-from scipy import ndimage
 
 from config import DATA_DIR, OUT_DIR
 
 HALF = 400    # 800 x 800 px crop = 8 x 8 km
 
-change = rioxarray.open_rasterio(DATA_DIR / "change_unet.tif").values[0]
+change = rioxarray.open_rasterio(DATA_DIR / "change_unet_v3.tif").values[0]   # v3: the most accurate map
 loss = change == 1
 
-# Centre the crop where cleared area is densest (smoothed loss map, 4 km box).
-density = ndimage.uniform_filter(loss.astype("float32")[::8, ::8], size=50)
-r, c = np.unravel_index(density.argmax(), density.shape)
-r, c = np.clip(r * 8, HALF, loss.shape[0] - HALF), np.clip(c * 8, HALF, loss.shape[1] - HALF)
+# A view with large, clearly visible clearings (first found as the densest-loss spot of
+# the v1 map); kept fixed so the README figure stays comparable across model versions.
+r, c = 1272, 3824
 win = (slice(r - HALF, r + HALF), slice(c - HALF, c + HALF))
 
 
