@@ -7,8 +7,9 @@ around it, so its prediction is less trustworthy than one near the centre.
 
 Run:  .venv/Scripts/python src/08_predict.py         (v1: 4 bands)
       .venv/Scripts/python src/08_predict.py v2      (v2: 6 bands with SWIR)
+      .venv/Scripts/python src/08_predict.py v3      (v3: 4 bands, trained on MapBiomas labels)
 Makes: data/forest_prob_{before,after,after_raw}.tif   (0-100 = % forest probability, 255 = no data)
-       data/forest_prob_{before,after}_v2.tif
+       data/forest_prob_{before,after}_{v2,v3}.tif
 """
 import sys
 import time
@@ -22,7 +23,7 @@ from model import load_model, to_features
 
 TILE, STEP, BATCH = 256, 192, 8
 
-VERSION = "v2" if "v2" in sys.argv[1:] else "v1"
+VERSION = next((a for a in sys.argv[1:] if a in ("v2", "v3")), "v1")
 model, mean, std = load_model(VERSION)
 
 # Window weight: 2D bump, high in the middle, low (not zero) at the edges.
@@ -70,6 +71,9 @@ if VERSION == "v1":
     predict(["composite_before"], "before")
     predict(["composite_after_norm"], "after")
     predict(["composite_after"], "after_raw")   # without normalization, to measure its effect
-else:
+elif VERSION == "v2":
     predict(["composite_before", "composite_before_swir"], "before_v2")
     predict(["composite_after_norm", "composite_after_swir_norm"], "after_v2")
+else:
+    predict(["composite_before"], "before_v3")
+    predict(["composite_after_norm"], "after_v3")

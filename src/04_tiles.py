@@ -2,8 +2,10 @@
 
 Run:  .venv/Scripts/python src/04_tiles.py          (4 bands)
       .venv/Scripts/python src/04_tiles.py swir     (6 bands: + SWIR1, SWIR2; same tiles, same split)
+      .venv/Scripts/python src/04_tiles.py mapbiomas (4 bands, MapBiomas labels; same tiles, same split)
 Makes: data/tiles/{train,val,test}.npz   (X: N x 4 x 256 x 256 uint16, y: N x 256 x 256 uint8)
        data/tiles_swir/{train,val,test}.npz  (X: N x 6 x 256 x 256)
+       data/tiles_mapbiomas/{train,val,test}.npz
        outputs/04_split_map.png
 """
 import sys
@@ -21,12 +23,17 @@ MAX_NODATA = 0.10    # skip tiles that are more than 10% empty
 SEED = 42
 
 SWIR = "swir" in sys.argv[1:]
+MAPBIOMAS = "mapbiomas" in sys.argv[1:]
 image = rioxarray.open_rasterio(DATA_DIR / "composite_before.tif").values  # (4, H, W)
 if SWIR:
     swir = rioxarray.open_rasterio(DATA_DIR / "composite_before_swir.tif").values
     image = np.concatenate([image, swir])                                   # (6, H, W)
     del swir
 labels = rioxarray.open_rasterio(DATA_DIR / "labels_2021.tif").values[0]   # (H, W)
+# Which tiles to keep is always decided by the WorldCover no-data rule, so every
+# version uses exactly the same tiles; only the label values change.
+train_labels = (rioxarray.open_rasterio(DATA_DIR / "labels_2021_mapbiomas.tif").values[0]
+                if MAPBIOMAS else labels)
 n_rows, n_cols = labels.shape[0] // TILE, labels.shape[1] // TILE
 
 # Spatial split. Neighboring tiles look almost identical, so a random per-tile
@@ -54,10 +61,10 @@ for r in range(n_rows):
             continue
         split = block_split[r // BLOCK, c // BLOCK]
         tiles[split][0].append(image[:, ys, xs])
-        tiles[split][1].append(y)
+        tiles[split][1].append(train_labels[ys, xs])
         split_map[r, c] = ["train", "val", "test"].index(split)
 
-out_dir = DATA_DIR / ("tiles_swir" if SWIR else "tiles")
+out_dir = DATA_DIR / ("tiles_swir" if SWIR else "tiles_mapbiomas" if MAPBIOMAS else "tiles")
 out_dir.mkdir(exist_ok=True)
 for split, (X, y) in tiles.items():
     X, y = np.stack(X), np.stack(y)

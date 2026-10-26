@@ -1,0 +1,8 @@
+{
+ "both_loss": 364706,
+ "v1_only_loss": 505828,
+ "v3_only_loss": 243692,
+ "edge": 12769954,
+ "forest": 5121958,
+ "other": 11363967
+}

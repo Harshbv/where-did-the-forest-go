@@ -14,7 +14,8 @@ The strata come from the v1 map (that's how the points were drawn), but the esti
 work for ANY map: for v2 we just read the v2 map's class at each point. The labels
 describe the ground, not a map, so they don't need redoing.
 
-Run:  .venv/Scripts/python src/14_accuracy.py [v2] [path/to/labels.csv]
+Run:  .venv/Scripts/python src/14_accuracy.py [v2|v3] [round2] [path/to/labels.csv]
+      round2 = score on the fresh round 2 points (validation2/) instead of round 1
 """
 import csv
 import json
@@ -29,13 +30,14 @@ PIXEL_HA = 0.01
 CLASSES = ["cleared", "regrew", "stayed_forest", "never_forest"]
 
 args = sys.argv[1:]
-V = "_v2" if "v2" in args else ""
+V = next(("_" + a for a in args if a in ("v2", "v3")), "")
 csv_args = [a for a in args if a.endswith(".csv")]
-labels_path = csv_args[0] if csv_args else ROOT / "validation" / "labels.csv"
+VAL = ROOT / ("validation2" if "round2" in args else "validation")
+labels_path = csv_args[0] if csv_args else VAL / "labels.csv"
 
-samples = {int(r["id"]): r for r in csv.DictReader(open(ROOT / "validation" / "samples.csv"))}
+samples = {int(r["id"]): r for r in csv.DictReader(open(VAL / "samples.csv"))}
 labels = {int(r["id"]): r["label"] for r in csv.DictReader(open(labels_path))}
-area = {k: v * PIXEL_HA for k, v in json.load(open(ROOT / "validation" / "strata_pixels.json")).items()}
+area = {k: v * PIXEL_HA for k, v in json.load(open(VAL / "strata_pixels.json")).items()}
 total_area = sum(area.values())
 
 # What this version's map says at each point.
@@ -101,5 +103,5 @@ json.dump({"map": f"change_unet{V}.tif", "mapped_cleared_ha": float(mapped_ha),
            "n_labelled": len(labels), "n_used": len(used),
            **{key: {"estimate": float(point[k]), "ci95": [float(lo[k]), float(hi[k])]}
               for k, key in enumerate(["precision", "recall", "cleared_ha", "overall_accuracy"])}},
-          open(ROOT / "validation" / f"accuracy{V}.json", "w"), indent=1)
-print(f"\nSaved {ROOT / 'validation' / f'accuracy{V}.json'}")
+          open(VAL / f"accuracy{V}.json", "w"), indent=1)
+print(f"\nSaved {VAL / f'accuracy{V}.json'}")

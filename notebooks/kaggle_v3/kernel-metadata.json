@@ -1,0 +1,13 @@
+{
+  "id": "harshinibv/forest-unet-mapbiomas",
+  "title": "forest-unet-mapbiomas",
+  "code_file": "train_v3.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": false,
+  "dataset_sources": ["harshinibv/rondonia-forest-tiles-mapbiomas"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

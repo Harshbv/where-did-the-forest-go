@@ -10,6 +10,7 @@ Rules (each one removes a kind of false alarm):
 
 Run:  .venv/Scripts/python src/09_change.py          (v1)
       .venv/Scripts/python src/09_change.py v2       (v2: SWIR model; writes *_v2 files)
+      .venv/Scripts/python src/09_change.py v3       (v3: MapBiomas-label model; writes *_v3 files)
 Makes: data/change_unet.tif, data/change_ndvi.tif (0 none, 1 loss, 2 gain, 255 no data)
        outputs/loss_patches.geojson, outputs/09_change_overview.png
 """
@@ -24,7 +25,7 @@ from scipy import ndimage
 
 from config import DATA_DIR, OUT_DIR
 
-V = "_v2" if "v2" in sys.argv[1:] else ""     # file name suffix
+V = next(("_" + a for a in sys.argv[1:] if a in ("v2", "v3")), "")     # file name suffix
 HIGH, LOW = 60, 40
 MMU_PIXELS = 50           # 50 px x 100 m2 = 0.5 ha
 PIXEL_HA = 0.01           # one 10 m x 10 m pixel = 100 m2 = 0.01 ha

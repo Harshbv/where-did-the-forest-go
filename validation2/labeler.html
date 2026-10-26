@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forest Labeler Round 2</title>
+<style>
+  :root { --bg:#f6f7f5; --card:#fff; --ink:#1d2320; --muted:#66706b; --line:#d9ddd9; --accent:#1f6f43; --mark:#ffea00; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  .wrap { max-width:1300px; margin:0 auto; padding:16px; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+  h1 { font-size:20px; margin:0; }
+  .bar { flex:1; min-width:200px; height:10px; background:var(--line); border-radius:5px; overflow:hidden; }
+  .bar div { height:100%; background:var(--accent); width:0; }
+  .grid { display:grid; grid-template-columns:repeat(4, auto); gap:10px; justify-content:center; margin:14px 0; }
+  figure { margin:0; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:6px; }
+  figcaption { font-size:13px; color:var(--muted); text-align:center; margin-bottom:4px; }
+  figcaption b { color:var(--ink); }
+  .img { position:relative; width:305px; height:305px; }
+  .img img { width:100%; height:100%; image-rendering:pixelated; display:block; }
+  .box { position:absolute; border:2px solid var(--mark); box-shadow:0 0 0 1px #000; pointer-events:none; }
+  .buttons { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  button { font:inherit; padding:10px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  kbd { font:12px ui-monospace, monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-right:6px; background:#f0f2f0; color:#333; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-items:center; margin-top:12px; color:var(--muted); font-size:14px; }
+  .help { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-top:16px; font-size:14px; }
+  .help b { color:var(--accent); }
+  a { color:var(--accent); }
+  @media (max-width: 1300px) { .grid { grid-template-columns:repeat(2, auto); } }
+  @media (max-width: 660px) { .grid { grid-template-columns:auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Point <span id="num"></span> / <span id="total"></span></h1>
+    <div class="bar"><div id="fill"></div></div>
+    <span id="done"></span>
+  </header>
+
+  <div class="grid">
+    <figure><figcaption><b>2021</b> close-up (600 m)</figcaption><div class="img"><img id="c21"><div class="box" style="left:145px;top:145px;width:11px;height:11px"></div></div></figure>
+    <figure><figcaption><b>2026</b> close-up (600 m)</figcaption><div class="img"><img id="c26"><div class="box" style="left:145px;top:145px;width:11px;height:11px"></div></div></figure>
+    <figure><figcaption><b>2021</b> wide view (3 km)</figcaption><div class="img"><img id="w21"><div class="box" style="left:119px;top:119px;width:63px;height:63px"></div></div></figure>
+    <figure><figcaption><b>2026</b> wide view (3 km)</figcaption><div class="img"><img id="w26"><div class="box" style="left:119px;top:119px;width:63px;height:63px"></div></div></figure>
+  </div>
+
+  <div class="buttons" id="buttons"></div>
+  <div class="row">
+    <button id="back">← Back</button>
+    <button id="next">Skip →</button>
+    <a id="gmaps" target="_blank" rel="noopener">Open in Google Maps (newer, sharper photo)</a>
+    <button id="download">⬇ Download labels (CSV)</button>
+  </div>
+
+  <div class="help">
+    Label the pixel inside the <b>small yellow box</b> in the close-ups (one 10 x 10 m pixel). The big box in the wide view just shows where the close-up is.<br>
+    <b>1 Cleared</b>: trees in 2021, gone in 2026 (pasture, bare soil, crop). &nbsp;
+    <b>2 Stayed forest</b>: trees both years, even if burnt or thinned. &nbsp;
+    <b>3 Never forest</b>: no trees in either year. &nbsp;
+    <b>4 Regrew</b>: no trees in 2021, trees in 2026. &nbsp;
+    <b>5 Can't tell</b>: really impossible to decide.<br>
+    Your answers save in this browser automatically. Download the CSV when you're done (or any time, as a backup).
+  </div>
+</div>
+
+<script>
+const POINTS = [{"id": 0, "lat": -9.519187, "lon": -63.276848}, {"id": 1, "lat": -9.70805, "lon": -63.263783}, {"id": 2, "lat": -9.832861, "lon": -63.108845}, {"id": 3, "lat": -9.779341, "lon": -63.423864}, {"id": 4, "lat": -9.571424, "lon": -63.207178}, {"id": 5, "lat": -9.524495, "lon": -63.182549}, {"id": 6, "lat": -9.732389, "lon": -63.038246}, {"id": 7, "lat": -9.954065, "lon": -63.358311}, {"id": 8, "lat": -9.789328, "lon": -63.303239}, {"id": 9, "lat": -9.959248, "lon": -63.222107}, {"id": 10, "lat": -9.944532, "lon": -63.303837}, {"id": 11, "lat": -9.541678, "lon": -63.186841}, {"id": 12, "lat": -9.918528, "lon": -63.249811}, {"id": 13, "lat": -9.558393, "lon": -63.331736}, {"id": 14, "lat": -9.637457, "lon": -63.403725}, {"id": 15, "lat": -9.832013, "lon": -63.395934}, {"id": 16, "lat": -9.692015, "lon": -63.386288}, {"id": 17, "lat": -9.598889, "lon": -63.035315}, {"id": 18, "lat": -9.977146, "lon": -63.421015}, {"id": 19, "lat": -9.875553, "lon": -63.267108}, {"id": 20, "lat": -9.867214, "lon": -63.289994}, {"id": 21, "lat": -9.877399, "lon": -63.215941}, {"id": 22, "lat": -9.524622, "lon": -63.088792}, {"id": 23, "lat": -9.714597, "lon": -63.214559}, {"id": 24, "lat": -9.910787, "lon": -63.194161}, {"id": 25, "lat": -9.553356, "lon": -63.165616}, {"id": 26, "lat": -9.676375, "lon": -63.287641}, {"id": 27, "lat": -9.730857, "lon": -63.428544}, {"id": 28, "lat": -9.630897, "lon": -63.094561}, {"id": 29, "lat": -9.635736, "lon": -63.19947}, {"id": 30, "lat": -9.637002, "lon": -63.199562}, {"id": 31, "lat": -9.536345, "lon": -63.470303}, {"id": 32, "lat": -9.560232, "lon": -63.298478}, {"id": 33, "lat": -9.958832, "lon": -63.292812}, {"id": 34, "lat": -9.682352, "lon": -63.278531}, {"id": 35, "lat": -9.9836, "lon": -63.308436}, {"id": 36, "lat": -9.786085, "lon": -63.147219}, {"id": 37, "lat": -9.755273, "lon": -63.250873}, {"id": 38, "lat": -9.772879, "lon": -63.149857}, {"id": 39, "lat": -9.887836, "lon": -63.379947}, {"id": 40, "lat": -9.674025, "lon": -63.138784}, {"id": 41, "lat": -9.711635, "lon": -63.174627}, {"id": 42, "lat": -9.787621, "lon": -63.150685}, {"id": 43, "lat": -9.944733, "lon": -63.373536}, {"id": 44, "lat": -9.638276, "lon": -63.471172}, {"id": 45, "lat": -9.744217, "lon": -63.278217}, {"id": 46, "lat": -9.650808, "lon": -63.353155}, {"id": 47, "lat": -9.552373, "lon": -63.286352}, {"id": 48, "lat": -9.750013, "lon": -63.269743}, {"id": 49, "lat": -9.871666, "lon": -63.438575}, {"id": 50, "lat": -9.709324, "lon": -63.049092}, {"id": 51, "lat": -9.798341, "lon": -63.336896}, {"id": 52, "lat": -9.734812, "lon": -63.277115}, {"id": 53, "lat": -9.600503, "lon": -63.271082}, {"id": 54, "lat": -9.538849, "lon": -63.339553}, {"id": 55, "lat": -9.841154, "lon": -63.390564}, {"id": 56, "lat": -9.686127, "lon": -63.176984}, {"id": 57, "lat": -9.606803, "lon": -63.309181}, {"id": 58, "lat": -9.780285, "lon": -63.462982}, {"id": 59, "lat": -9.639582, "lon": -63.086361}, {"id": 60, "lat": -9.537931, "lon": -63.433494}, {"id": 61, "lat": -9.743678, "lon": -63.370119}, {"id": 62, "lat": -9.646829, "lon": -63.431536}, {"id": 63, "lat": -9.514241, "lon": -63.346545}, {"id": 64, "lat": -9.737672, "lon": -63.195063}, {"id": 65, "lat": -9.586728, "lon": -63.467091}, {"id": 66, "lat": -9.843171, "lon": -63.367037}, {"id": 67, "lat": -9.722341, "lon": -63.088296}, {"id": 68, "lat": -9.677568, "lon": -63.094028}, {"id": 69, "lat": -9.889398, "lon": -63.357876}, {"id": 70, "lat": -9.774054, "lon": -63.150679}, {"id": 71, "lat": -9.870048, "lon": -63.049389}, {"id": 72, "lat": -9.949534, "lon": -63.441141}, {"id": 73, "lat": -9.905041, "lon": -63.093818}, {"id": 74, "lat": -9.701168, "lon": -63.113634}, {"id": 75, "lat": -9.912345, "lon": -63.154116}, {"id": 76, "lat": -9.981479, "lon": -63.042654}, {"id": 77, "lat": -9.760585, "lon": -63.133896}, {"id": 78, "lat": -9.96711, "lon": -63.33871}, {"id": 79, "lat": -9.927502, "lon": -63.221903}, {"id": 80, "lat": -9.519797, "lon": -63.394657}, {"id": 81, "lat": -9.876094, "lon": -63.441499}, {"id": 82, "lat": -9.639779, "lon": -63.241491}, {"id": 83, "lat": -9.531143, "lon": -63.039955}, {"id": 84, "lat": -9.925398, "lon": -63.354448}, {"id": 85, "lat": -9.697092, "lon": -63.28146}, {"id": 86, "lat": -9.762588, "lon": -63.363666}, {"id": 87, "lat": -9.895045, "lon": -63.402485}, {"id": 88, "lat": -9.888493, "lon": -63.358148}, {"id": 89, "lat": -9.693351, "lon": -63.47526}, {"id": 90, "lat": -9.914799, "lon": -63.3704}, {"id": 91, "lat": -9.587369, "lon": -63.155608}, {"id": 92, "lat": -9.775421, "lon": -63.372707}, {"id": 93, "lat": -9.78792, "lon": -63.062873}, {"id": 94, "lat": -9.642492, "lon": -63.242495}, {"id": 95, "lat": -9.905052, "lon": -63.428859}, {"id": 96, "lat": -9.56157, "lon": -63.197878}, {"id": 97, "lat": -9.782385, "lon": -63.126519}, {"id": 98, "lat": -9.771522, "lon": -63.149583}, {"id": 99, "lat": -9.642578, "lon": -63.249058}, {"id": 100, "lat": -9.871441, "lon": -63.471226}, {"id": 101, "lat": -9.533731, "lon": -63.162326}, {"id": 102, "lat": -9.630153, "lon": -63.150068}, {"id": 103, "lat": -9.90765, "lon": -63.135506}, {"id": 104, "lat": -9.850238, "lon": -63.061152}, {"id": 105, "lat": -9.836853, "lon": -63.432327}, {"id": 106, "lat": -9.967971, "lon": -63.149672}, {"id": 107, "lat": -9.754723, "lon": -63.437053}, {"id": 108, "lat": -9.596501, "lon": -63.463277}, {"id": 109, "lat": -9.763845, "lon": -63.372147}, {"id": 110, "lat": -9.850262, "lon": -63.331567}, {"id": 111, "lat": -9.782647, "lon": -63.150409}, {"id": 112, "lat": -9.59803, "lon": -63.469203}, {"id": 113, "lat": -9.687393, "lon": -63.17899}, {"id": 114, "lat": -9.928432, "lon": -63.180214}, {"id": 115, "lat": -9.681444, "lon": -63.131768}, {"id": 116, "lat": -9.772214, "lon": -63.324834}, {"id": 117, "lat": -9.929339, "lon": -63.174559}, {"id": 118, "lat": -9.961146, "lon": -63.224389}, {"id": 119, "lat": -9.844338, "lon": -63.280945}, {"id": 120, "lat": -9.635872, "lon": -63.089914}, {"id": 121, "lat": -9.555616, "lon": -63.392876}, {"id": 122, "lat": -9.710299, "lon": -63.44912}, {"id": 123, "lat": -9.527398, "lon": -63.300818}, {"id": 124, "lat": -9.592752, "lon": -63.424268}, {"id": 125, "lat": -9.660255, "lon": -63.310506}, {"id": 126, "lat": -9.903801, "lon": -63.416999}, {"id": 127, "lat": -9.94664, "lon": -63.441137}, {"id": 128, "lat": -9.784126, "lon": -63.430618}, {"id": 129, "lat": -9.634871, "lon": -63.273661}, {"id": 130, "lat": -9.78925, "lon": -63.148771}, {"id": 131, "lat": -9.760955, "lon": -63.443626}, {"id": 132, "lat": -9.918277, "lon": -63.41273}, {"id": 133, "lat": -9.56267, "lon": -63.303765}, {"id": 134, "lat": -9.779418, "lon": -63.356207}, {"id": 135, "lat": -9.533842, "lon": -63.273124}, {"id": 136, "lat": -9.687858, "lon": -63.292209}, {"id": 137, "lat": -9.706987, "lon": -63.233152}, {"id": 138, "lat": -9.967693, "lon": -63.164634}, {"id": 139, "lat": -9.555683, "lon": -63.327906}, {"id": 140, "lat": -9.623188, "lon": -63.152616}, {"id": 141, "lat": -9.838077, "lon": -63.305108}, {"id": 142, "lat": -9.848778, "lon": -63.36759}, {"id": 143, "lat": -9.527064, "lon": -63.088064}, {"id": 144, "lat": -9.519114, "lon": -63.033029}, {"id": 145, "lat": -9.740428, "lon": -63.364645}, {"id": 146, "lat": -9.70105, "lon": -63.17845}, {"id": 147, "lat": -9.911014, "lon": -63.079772}, {"id": 148, "lat": -9.727335, "lon": -63.343388}, {"id": 149, "lat": -9.599042, "lon": -63.289307}, {"id": 150, "lat": -9.875339, "lon": -63.181462}, {"id": 151, "lat": -9.874471, "lon": -63.360961}, {"id": 152, "lat": -9.635031, "lon": -63.164106}, {"id": 153, "lat": -9.87546, "lon": -63.441681}, {"id": 154, "lat": -9.516567, "lon": -63.371329}, {"id": 155, "lat": -9.95573, "lon": -63.405205}, {"id": 156, "lat": -9.778306, "lon": -63.14913}, {"id": 157, "lat": -9.661932, "lon": -63.023745}, {"id": 158, "lat": -9.901674, "lon": -63.15174}, {"id": 159, "lat": -9.927048, "lon": -63.333286}, {"id": 160, "lat": -9.784573, "lon": -63.067796}, {"id": 161, "lat": -9.913688, "lon": -63.18121}, {"id": 162, "lat": -9.970857, "lon": -63.457227}, {"id": 163, "lat": -9.642537, "lon": -63.167755}, {"id": 164, "lat": -9.778166, "lon": -63.423133}, {"id": 165, "lat": -9.885946, "lon": -63.446346}, {"id": 166, "lat": -9.592548, "lon": -63.089265}, {"id": 167, "lat": -9.683549, "lon": -63.026026}, {"id": 168, "lat": -9.914819, "lon": -63.046751}, {"id": 169, "lat": -9.685621, "lon": -63.261487}, {"id": 170, "lat": -9.826927, "lon": -63.220194}, {"id": 171, "lat": -9.881896, "lon": -63.051854}, {"id": 172, "lat": -9.515114, "lon": -63.280125}, {"id": 173, "lat": -9.558259, "lon": -63.374837}, {"id": 174, "lat": -9.629938, "lon": -63.215326}, {"id": 175, "lat": -9.819039, "lon": -63.249097}, {"id": 176, "lat": -9.772575, "lon": -63.409267}, {"id": 177, "lat": -9.518685, "lon": -63.333793}, {"id": 178, "lat": -9.559053, "lon": -63.168717}, {"id": 179, "lat": -9.559023, "lon": -63.221842}, {"id": 180, "lat": -9.876133, "lon": -63.216122}, {"id": 181, "lat": -9.954558, "lon": -63.201942}, {"id": 182, "lat": -9.547852, "lon": -63.136454}, {"id": 183, "lat": -9.559123, "lon": -63.324447}, {"id": 184, "lat": -9.77884, "lon": -63.388941}, {"id": 185, "lat": -9.644198, "lon": -63.072416}, {"id": 186, "lat": -9.946187, "lon": -63.441593}, {"id": 187, "lat": -9.701358, "lon": -63.082457}, {"id": 188, "lat": -9.653199, "lon": -63.187358}, {"id": 189, "lat": -9.530247, "lon": -63.24278}, {"id": 190, "lat": -9.690248, "lon": -63.242621}, {"id": 191, "lat": -9.883282, "lon": -63.323574}, {"id": 192, "lat": -9.789538, "lon": -63.366157}, {"id": 193, "lat": -9.908944, "lon": -63.245242}, {"id": 194, "lat": -9.598979, "lon": -63.044519}, {"id": 195, "lat": -9.814671, "lon": -63.375942}, {"id": 196, "lat": -9.835281, "lon": -63.162015}, {"id": 197, "lat": -9.954765, "lon": -63.153315}, {"id": 198, "lat": -9.72801, "lon": -63.461725}, {"id": 199, "lat": -9.909265, "lon": -63.165335}, {"id": 200, "lat": -9.556851, "lon": -63.419667}, {"id": 201, "lat": -9.589844, "lon": -63.036225}, {"id": 202, "lat": -9.516915, "lon": -63.145371}, {"id": 203, "lat": -9.701814, "lon": -63.358039}, {"id": 204, "lat": -9.726655, "lon": -63.4599}, {"id": 205, "lat": -9.666857, "lon": -63.470392}, {"id": 206, "lat": -9.642013, "lon": -63.277586}, {"id": 207, "lat": -9.806098, "lon": -63.357604}, {"id": 208, "lat": -9.572315, "lon": -63.227592}, {"id": 209, "lat": -9.554432, "lon": -63.311594}, {"id": 210, "lat": -9.863902, "lon": -63.348545}, {"id": 211, "lat": -9.784565, "lon": -63.099893}, {"id": 212, "lat": -9.692424, "lon": -63.2346}, {"id": 213, "lat": -9.645084, "lon": -63.133121}, {"id": 214, "lat": -9.870229, "lon": -63.049663}, {"id": 215, "lat": -9.834201, "lon": -63.152256}, {"id": 216, "lat": -9.645059, "lon": -63.470999}, {"id": 217, "lat": -9.721919, "lon": -63.484143}, {"id": 218, "lat": -9.924873, "lon": -63.337572}, {"id": 219, "lat": -9.674762, "lon": -63.268589}, {"id": 220, "lat": -9.602947, "lon": -63.09984}, {"id": 221, "lat": -9.639798, "lon": -63.213783}, {"id": 222, "lat": -9.596539, "lon": -63.015721}, {"id": 223, "lat": -9.937149, "lon": -63.36112}, {"id": 224, "lat": -9.811771, "lon": -63.148598}, {"id": 225, "lat": -9.634651, "lon": -63.199105}, {"id": 226, "lat": -9.932174, "lon": -63.361936}, {"id": 227, "lat": -9.914878, "lon": -63.453409}, {"id": 228, "lat": -9.896435, "lon": -63.374028}, {"id": 229, "lat": -9.593117, "lon": -63.339425}, {"id": 230, "lat": -9.82492, "lon": -63.24518}, {"id": 231, "lat": -9.573471, "lon": -63.056727}, {"id": 232, "lat": -9.972969, "lon": -63.258884}, {"id": 233, "lat": -9.772213, "lon": -63.409813}, {"id": 234, "lat": -9.575331, "lon": -63.304779}, {"id": 235, "lat": -9.799979, "lon": -63.409756}, {"id": 236, "lat": -9.733714, "lon": -63.152757}, {"id": 237, "lat": -9.627519, "lon": -63.304734}, {"id": 238, "lat": -9.564042, "lon": -63.136187}, {"id": 239, "lat": -9.562137, "lon": -63.149217}, {"id": 240, "lat": -9.859897, "lon": -63.372436}, {"id": 241, "lat": -9.702165, "lon": -63.109623}, {"id": 242, "lat": -9.887019, "lon": -63.155838}, {"id": 243, "lat": -9.651015, "lon": -63.211237}, {"id": 244, "lat": -9.622929, "lon": -63.277479}, {"id": 245, "lat": -9.738901, "lon": -63.039706}, {"id": 246, "lat": -9.646865, "lon": -63.193005}, {"id": 247, "lat": -9.960443, "lon": -63.190724}, {"id": 248, "lat": -9.885529, "lon": -63.418709}, {"id": 249, "lat": -9.548468, "lon": -63.39551}, {"id": 250, "lat": -9.860319, "lon": -63.469113}, {"id": 251, "lat": -9.692774, "lon": -63.25183}, {"id": 252, "lat": -9.87562, "lon": -63.385132}, {"id": 253, "lat": -9.92129, "lon": -63.174098}, {"id": 254, "lat": -9.734656, "lon": -63.428184}, {"id": 255, "lat": -9.771907, "lon": -63.43744}, {"id": 256, "lat": -9.564584, "lon": -63.138192}, {"id": 257, "lat": -9.677897, "lon": -63.175795}, {"id": 258, "lat": -9.931946, "lon": -63.318513}, {"id": 259, "lat": -9.824365, "lon": -63.261869}, {"id": 260, "lat": -9.822024, "lon": -63.014272}, {"id": 261, "lat": -9.558649, "lon": -63.347045}, {"id": 262, "lat": -9.968706, "lon": -63.122758}, {"id": 263, "lat": -9.783624, "lon": -63.186063}, {"id": 264, "lat": -9.619673, "lon": -63.277659}, {"id": 265, "lat": -9.955157, "lon": -63.351743}, {"id": 266, "lat": -9.640665, "lon": -63.266556}, {"id": 267, "lat": -9.619208, "lon": -63.153344}, {"id": 268, "lat": -9.87018, "lon": -63.3968}, {"id": 269, "lat": -9.785833, "lon": -63.363144}, {"id": 270, "lat": -9.656799, "lon": -63.414413}, {"id": 271, "lat": -9.811771, "lon": -63.149966}, {"id": 272, "lat": -9.569395, "lon": -63.364096}, {"id": 273, "lat": -9.947655, "lon": -63.245089}, {"id": 274, "lat": -9.528406, "lon": -63.135444}, {"id": 275, "lat": -9.694986, "lon": -63.39878}, {"id": 276, "lat": -9.906575, "lon": -63.106954}, {"id": 277, "lat": -9.612175, "lon": -63.090546}, {"id": 278, "lat": -9.536008, "lon": -63.124058}, {"id": 279, "lat": -9.565111, "lon": -63.394527}, {"id": 280, "lat": -9.968604, "lon": -63.149764}, {"id": 281, "lat": -9.866193, "lon": -63.318541}, {"id": 282, "lat": -9.636054, "lon": -63.086542}, {"id": 283, "lat": -9.534105, "lon": -63.454719}, {"id": 284, "lat": -9.567956, "lon": -63.355985}, {"id": 285, "lat": -9.757712, "lon": -63.058855}, {"id": 286, "lat": -9.815508, "lon": -63.056403}, {"id": 287, "lat": -9.919107, "lon": -63.469652}, {"id": 288, "lat": -9.636097, "lon": -63.477185}, {"id": 289, "lat": -9.971596, "lon": -63.372654}, {"id": 290, "lat": -9.791821, "lon": -63.424883}, {"id": 291, "lat": -9.528989, "lon": -63.423369}, {"id": 292, "lat": -9.553277, "lon": -63.287264}, {"id": 293, "lat": -9.606532, "lon": -63.469214}, {"id": 294, "lat": -9.561496, "lon": -63.46487}, {"id": 295, "lat": -9.78352, "lon": -63.209862}, {"id": 296, "lat": -9.743871, "lon": -63.258159}, {"id": 297, "lat": -9.859236, "lon": -63.187838}, {"id": 298, "lat": -9.623371, "lon": -63.147877}, {"id": 299, "lat": -9.637222, "lon": -63.274483}];
+const LABELS = ["cleared", "stayed_forest", "never_forest", "regrew", "cant_tell"];
+const NAMES = ["Cleared", "Stayed forest", "Never forest", "Regrew", "Can't tell"];
+const KEY = "forest-labels-round2";
+let answers = {};
+try { answers = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+let i = POINTS.findIndex(p => !(p.id in answers));
+if (i < 0) i = 0;
+
+const $ = id => document.getElementById(id);
+$("total").textContent = POINTS.length;
+NAMES.forEach((n, k) => {
+  const b = document.createElement("button");
+  b.innerHTML = `<kbd>${k + 1}</kbd>${n}`;
+  b.onclick = () => label(k);
+  $("buttons").appendChild(b);
+});
+
+function pad(n) { return String(n).padStart(3, "0"); }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(answers)); } catch (e) {} }
+
+function show() {
+  const p = POINTS[i], id = pad(p.id);
+  $("num").textContent = i + 1;
+  $("c21").src = `chips/${id}_2021_close.jpg`; $("c26").src = `chips/${id}_2026_close.jpg`;
+  $("w21").src = `chips/${id}_2021_wide.jpg`;  $("w26").src = `chips/${id}_2026_wide.jpg`;
+  $("gmaps").href = `https://www.google.com/maps/@${p.lat},${p.lon},400m/data=!3m1!1e3`;
+  [...$("buttons").children].forEach((b, k) => b.classList.toggle("on", answers[p.id] === LABELS[k]));
+  const n = Object.keys(answers).length;
+  $("done").textContent = `${n} labelled`;
+  $("fill").style.width = `${100 * n / POINTS.length}%`;
+}
+
+function label(k) {
+  answers[POINTS[i].id] = LABELS[k];
+  save();
+  if (i < POINTS.length - 1) i++;
+  show();
+}
+
+function download() {
+  const rows = ["id,label", ...POINTS.filter(p => p.id in answers).map(p => `${p.id},${answers[p.id]}`)];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  a.download = "labels_round2.csv";
+  a.click();
+}
+
+$("back").onclick = () => { if (i > 0) i--; show(); };
+$("next").onclick = () => { if (i < POINTS.length - 1) i++; show(); };
+$("download").onclick = download;
+document.addEventListener("keydown", e => {
+  if (e.key >= "1" && e.key <= "5") label(+e.key - 1);
+  else if (e.key === "ArrowLeft" || e.key === "Backspace") { e.preventDefault(); $("back").onclick(); }
+  else if (e.key === "ArrowRight") $("next").onclick();
+});
+show();
+</script>
+</body>
+</html>
