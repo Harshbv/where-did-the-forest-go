@@ -8,10 +8,13 @@ Rules (each one removes a kind of false alarm):
      "loss" slivers along every border.
   3. Minimum mapping unit (MMU): drop patches smaller than 0.5 ha (50 pixels).
 
-Run:  .venv/Scripts/python src/09_change.py
+Run:  .venv/Scripts/python src/09_change.py          (v1)
+      .venv/Scripts/python src/09_change.py v2       (v2: SWIR model; writes *_v2 files)
 Makes: data/change_unet.tif, data/change_ndvi.tif (0 none, 1 loss, 2 gain, 255 no data)
        outputs/loss_patches.geojson, outputs/09_change_overview.png
 """
+import sys
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,6 +24,7 @@ from scipy import ndimage
 
 from config import DATA_DIR, OUT_DIR
 
+V = "_v2" if "v2" in sys.argv[1:] else ""     # file name suffix
 HIGH, LOW = 60, 40
 MMU_PIXELS = 50           # 50 px x 100 m2 = 0.5 ha
 PIXEL_HA = 0.01           # one 10 m x 10 m pixel = 100 m2 = 0.01 ha
@@ -42,9 +46,9 @@ def save(change, da, name):
         DATA_DIR / f"change_{name}.tif", compress="deflate")
 
 
-p_before = rioxarray.open_rasterio(DATA_DIR / "forest_prob_before.tif")
+p_before = rioxarray.open_rasterio(DATA_DIR / f"forest_prob_before{V}.tif")
 pb = p_before.values[0]
-pa = rioxarray.open_rasterio(DATA_DIR / "forest_prob_after.tif").values[0]
+pa = rioxarray.open_rasterio(DATA_DIR / f"forest_prob_after{V}.tif").values[0]
 valid = (pb != 255) & (pa != 255)
 
 # ---- U-Net change ----
@@ -52,7 +56,7 @@ loss = clean(valid & (pb >= HIGH) & (pa <= LOW))
 gain = clean(valid & (pb <= LOW) & (pa >= HIGH))
 change = np.zeros(pb.shape, "uint8")
 change[loss], change[gain], change[~valid] = 1, 2, 255
-save(change, p_before, "unet")
+save(change, p_before, f"unet{V}")
 
 forest21 = (pb > 50) & valid
 forest26 = (pa > 50) & valid
@@ -89,7 +93,7 @@ patches["forest_prob_2021"] = ndimage.mean(pb, lab, idx).round(0)
 patches["forest_prob_2026"] = ndimage.mean(pa, lab, idx).round(0)
 patches = patches.reset_index().sort_values("area_ha", ascending=False)
 patches["geometry"] = patches.simplify(10)        # 10 m tolerance: lighter web map
-patches.to_crs("EPSG:4326").to_file(OUT_DIR / "loss_patches.geojson", driver="GeoJSON")
+patches.to_crs("EPSG:4326").to_file(OUT_DIR / f"loss_patches{V}.geojson", driver="GeoJSON")
 print(f"{len(patches)} cleared patches   largest {patches.area_ha.max():.0f} ha   "
       f"median {patches.area_ha.median():.1f} ha")
 print("size classes:", ", ".join(
@@ -116,5 +120,5 @@ ax[2].set_title(f"RED = cleared ({loss.sum() * PIXEL_HA:,.0f} ha)   BLUE = regro
 for a in ax:
     a.axis("off")
 plt.tight_layout()
-plt.savefig(OUT_DIR / "09_change_overview.png", dpi=90)
-print(f"Saved {OUT_DIR / '09_change_overview.png'}")
+plt.savefig(OUT_DIR / f"09_change_overview{V}.png", dpi=90)
+print(f"Saved {OUT_DIR / f'09_change_overview{V}.png'}")

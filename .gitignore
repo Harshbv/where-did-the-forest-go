@@ -3,3 +3,4 @@ data/
 __pycache__/
 *.tif
 validation/chips/
+data/tiles_swir/*.npz

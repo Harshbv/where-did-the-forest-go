@@ -7,7 +7,9 @@ Two stages:
 
 Run:  .venv/Scripts/python src/02_composite.py            (both periods)
       .venv/Scripts/python src/02_composite.py after      (just one)
+      .venv/Scripts/python src/02_composite.py swir       (SWIR bands, both periods)
 Makes: data/composite_before.tif, data/composite_after.tif  (bands: blue, green, red, nir)
+       data/composite_{before,after}_swir.tif               (bands: swir1, swir2)
 """
 import sys
 import threading
@@ -28,7 +30,14 @@ from config import BBOX, COLLECTION, CRS, DATA_DIR, DATES, STAC_URL
 # SCL (scene classification) codes we throw away:
 # 0 no data, 1 saturated, 3 cloud shadow, 8 cloud (medium), 9 cloud (high), 10 thin cirrus
 BAD_SCL = [0, 1, 3, 8, 9, 10]
-REFLECTANCE_BANDS = ["B02", "B03", "B04", "B08"]
+# Band sets: (asset names, output names, file suffix, resampling).
+# SWIR (B11, B12) is measured at 20 m. Bilinear resampling to our 10 m grid gives
+# smooth values instead of blocky 2 x 2 copies. It shows water in leaves and soil:
+# moist forest canopy is dark, crops / scrub / bare soil are bright.
+BAND_SETS = {
+    "main": (["B02", "B03", "B04", "B08"], ["blue", "green", "red", "nir"], "", "nearest"),
+    "swir": (["B11", "B12"], ["swir1", "swir2"], "_swir", "bilinear"),
+}
 MAX_SCENES = 8
 CACHE = DATA_DIR / "cache"
 CACHE.mkdir(exist_ok=True)
@@ -46,16 +55,16 @@ def find_scenes(period):
     return full[:MAX_SCENES]
 
 
-def fetch(item, band, attempts=6):
+def fetch(item, band, resampling="nearest", attempts=6):
     """Download one band of one scene (clipped to our box) to a local GeoTIFF."""
     path = CACHE / f"{item.id}_{band}.tif"
     if path.exists():
         return path
     for attempt in range(1, attempts + 1):
         try:
-            # SCL holds class codes, so never interpolate it: use nearest neighbour.
+            # SCL holds class codes, so it always uses nearest neighbour (the default).
             da = load([item], bands=[band], bbox=BBOX, crs=CRS, resolution=10,
-                      resampling="nearest").isel(time=0)[band]
+                      resampling=resampling).isel(time=0)[band]
             tmp = path.with_suffix(".part.tif")
             da.rio.to_raster(tmp, tiled=True, compress="deflate")
             tmp.rename(path)  # only a complete file gets the real name
@@ -67,7 +76,8 @@ def fetch(item, band, attempts=6):
     raise RuntimeError(f"gave up on {item.id} {band}")
 
 
-def build_composite(name):
+def build_composite(name, band_set="main"):
+    asset_bands, band_names, suffix, resampling = BAND_SETS[band_set]
     items = sorted(find_scenes(DATES[name]), key=lambda it: it.datetime)
     print(f"\n[{name}] using {len(items)} scenes:")
     for it in items:
@@ -75,7 +85,7 @@ def build_composite(name):
               f"baseline {it.properties['s2:processing_baseline']}")
 
     # Stage 1: download, 4 files at a time.
-    jobs = [(it, b) for it in items for b in REFLECTANCE_BANDS + ["SCL"]]
+    jobs = [(it, b, resampling) for it in items for b in asset_bands] + [(it, "SCL") for it in items]
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda job: fetch(*job), jobs))
     print(f"[{name}] all {len(jobs)} band files cached")
@@ -95,7 +105,7 @@ def build_composite(name):
 
     good = ~stack("SCL").isin(BAD_SCL)          # True where the pixel is clear
     bands = []
-    for b in REFLECTANCE_BANDS:
+    for b in asset_bands:
         raw = stack(b)
         refl = (raw.astype("float32") - offset).clip(min=0)
         refl = refl.where(good & (raw > 0))      # cloudy / empty pixels become NaN
@@ -103,9 +113,9 @@ def build_composite(name):
         # Median (not mean) so a missed cloud or shadow can't drag the value.
         bands.append(refl.median("time", skipna=True))
 
-    comp = xr.concat(bands, dim="band").assign_coords(band=["blue", "green", "red", "nir"])
+    comp = xr.concat(bands, dim="band").assign_coords(band=band_names)
     comp = comp.fillna(0).round().astype("uint16").rio.write_crs(CRS).rio.write_nodata(0)
-    out = DATA_DIR / f"composite_{name}.tif"
+    out = DATA_DIR / f"composite_{name}{suffix}.tif"
     with dask.config.set(scheduler="threads", num_workers=4):
         comp.rio.to_raster(out, tiled=True, compress="deflate", lock=threading.Lock())
         n_clear = good.sum("time").compute().values
@@ -115,5 +125,7 @@ def build_composite(name):
 
 
 if __name__ == "__main__":
-    for name in sys.argv[1:] or DATES:
-        build_composite(name)
+    args = sys.argv[1:]
+    band_set = "swir" if "swir" in args else "main"
+    for name in [a for a in args if a in DATES] or DATES:
+        build_composite(name, band_set)

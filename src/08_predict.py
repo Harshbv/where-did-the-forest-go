@@ -5,9 +5,12 @@ image. Windows overlap (step 192) and their predictions are blended with weights
 fade towards each window's edge: a pixel near a window's border has little context
 around it, so its prediction is less trustworthy than one near the centre.
 
-Run:  .venv/Scripts/python src/08_predict.py
+Run:  .venv/Scripts/python src/08_predict.py         (v1: 4 bands)
+      .venv/Scripts/python src/08_predict.py v2      (v2: 6 bands with SWIR)
 Makes: data/forest_prob_{before,after,after_raw}.tif   (0-100 = % forest probability, 255 = no data)
+       data/forest_prob_{before,after}_v2.tif
 """
+import sys
 import time
 
 import numpy as np
@@ -19,17 +22,19 @@ from model import load_model, to_features
 
 TILE, STEP, BATCH = 256, 192, 8
 
-model, mean, std = load_model()
+VERSION = "v2" if "v2" in sys.argv[1:] else "v1"
+model, mean, std = load_model(VERSION)
 
 # Window weight: 2D bump, high in the middle, low (not zero) at the edges.
 w1 = 0.1 + 0.9 * np.hanning(TILE)
 weight = np.outer(w1, w1).astype("float32")
 
 
-def predict(src_name, out_name):
+def predict(src_names, out_name):
     t0 = time.time()
-    da = rioxarray.open_rasterio(DATA_DIR / f"{src_name}.tif")
-    img = da.values                                   # (4, H, W) uint16
+    da = rioxarray.open_rasterio(DATA_DIR / f"{src_names[0]}.tif")
+    img = np.concatenate([da.values] + [rioxarray.open_rasterio(DATA_DIR / f"{n}.tif").values
+                                        for n in src_names[1:]])   # (4 or 6, H, W) uint16
     _, H, W = img.shape
     # Pad bottom/right (mirror) so the windows tile the image exactly.
     pad_h = (-(H - TILE)) % STEP
@@ -61,6 +66,10 @@ def predict(src_name, out_name):
           f"({len(corners)} windows, {time.time() - t0:.0f}s)")
 
 
-predict("composite_before", "before")
-predict("composite_after_norm", "after")
-predict("composite_after", "after_raw")   # without normalization, to measure its effect
+if VERSION == "v1":
+    predict(["composite_before"], "before")
+    predict(["composite_after_norm"], "after")
+    predict(["composite_after"], "after_raw")   # without normalization, to measure its effect
+else:
+    predict(["composite_before", "composite_before_swir"], "before_v2")
+    predict(["composite_after_norm", "composite_after_swir_norm"], "after_v2")

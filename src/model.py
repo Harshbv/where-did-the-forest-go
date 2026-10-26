@@ -48,19 +48,29 @@ class UNet(nn.Module):
         return self.head(x).squeeze(1)
 
 
-def load_model():
-    """Trained U-Net (on CPU, in eval mode) plus the train mean/std it expects."""
-    model = UNet()
-    model.load_state_dict(torch.load(MODEL_DIR / "best_unet.pt", map_location="cpu"))
+def load_model(version="v1"):
+    """Trained U-Net (on CPU, in eval mode) plus the train mean/std it expects.
+    v1: 4 bands (models/), v2: 6 bands with SWIR (models/v2/)."""
+    folder = MODEL_DIR if version == "v1" else MODEL_DIR / version
+    stats = json.load(open(folder / "results.json"))
+    model = UNet(in_ch=len(stats["mean"]))
+    model.load_state_dict(torch.load(folder / "best_unet.pt", map_location="cpu"))
     model.eval()
-    stats = json.load(open(MODEL_DIR / "results.json"))
     return model, np.array(stats["mean"], "float32"), np.array(stats["std"], "float32")
 
 
+def index(a, b):
+    return (a - b) / (a + b + 1e-6)
+
+
 def to_features(X, mean, std):
-    """Raw bands (N, 4, H, W) uint16 -> standardised (N, 5, H, W): 4 bands + NDVI."""
+    """Raw bands uint16 -> standardised features.
+    (N, 4, H, W) -> (N, 5, H, W): blue, green, red, nir + NDVI
+    (N, 6, H, W) -> (N, 9, H, W): + swir1, swir2 + NDVI, NDMI (leaf moisture), NBR (burn)"""
     X = X.astype("float32") / 10000.0
     red, nir = X[:, 2], X[:, 3]
-    ndvi = (nir - red) / (nir + red + 1e-6)
-    feats = np.concatenate([X, ndvi[:, None]], axis=1)
+    extra = [index(nir, red)]
+    if X.shape[1] == 6:
+        extra += [index(nir, X[:, 4]), index(nir, X[:, 5])]
+    feats = np.concatenate([X, np.stack(extra, axis=1)], axis=1)
     return (feats - mean[None, :, None, None]) / std[None, :, None, None]

@@ -1,9 +1,13 @@
 """Phase 1c: cut the big image into 256x256 tiles and split them by location.
 
-Run:  .venv/Scripts/python src/04_tiles.py
+Run:  .venv/Scripts/python src/04_tiles.py          (4 bands)
+      .venv/Scripts/python src/04_tiles.py swir     (6 bands: + SWIR1, SWIR2; same tiles, same split)
 Makes: data/tiles/{train,val,test}.npz   (X: N x 4 x 256 x 256 uint16, y: N x 256 x 256 uint8)
+       data/tiles_swir/{train,val,test}.npz  (X: N x 6 x 256 x 256)
        outputs/04_split_map.png
 """
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import rioxarray
@@ -16,7 +20,12 @@ BLOCK = 4            # a "block" is 4x4 tiles (about 10 x 10 km)
 MAX_NODATA = 0.10    # skip tiles that are more than 10% empty
 SEED = 42
 
+SWIR = "swir" in sys.argv[1:]
 image = rioxarray.open_rasterio(DATA_DIR / "composite_before.tif").values  # (4, H, W)
+if SWIR:
+    swir = rioxarray.open_rasterio(DATA_DIR / "composite_before_swir.tif").values
+    image = np.concatenate([image, swir])                                   # (6, H, W)
+    del swir
 labels = rioxarray.open_rasterio(DATA_DIR / "labels_2021.tif").values[0]   # (H, W)
 n_rows, n_cols = labels.shape[0] // TILE, labels.shape[1] // TILE
 
@@ -48,7 +57,7 @@ for r in range(n_rows):
         tiles[split][1].append(y)
         split_map[r, c] = ["train", "val", "test"].index(split)
 
-out_dir = DATA_DIR / "tiles"
+out_dir = DATA_DIR / ("tiles_swir" if SWIR else "tiles")
 out_dir.mkdir(exist_ok=True)
 for split, (X, y) in tiles.items():
     X, y = np.stack(X), np.stack(y)

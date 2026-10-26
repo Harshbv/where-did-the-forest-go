@@ -7,6 +7,7 @@ on those "pseudo-invariant" pixels, then apply it to the whole 2026 image.
 
 Run:  .venv/Scripts/python src/07_normalize.py
 Makes: data/composite_after_norm.tif, outputs/07_normalization.png
+       data/composite_after_swir_norm.tif (if the SWIR composites exist; same reference pixels)
 """
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,15 +40,19 @@ built = (ndvi(b) < 0.2) & (ndvi(a) < 0.2) & (b[2] > 1200) & (a[2] > 1200)
 ref = (stable_forest | built) & (b[3] > 0) & (a[3] > 0)
 print(f"reference pixels: {stable_forest.sum():,} stable forest + {built.sum():,} bright built-up/bare")
 
-coeffs = {}
-fig, axes = plt.subplots(1, 4, figsize=(18, 4.5))
-for i, (band, ax) in enumerate(zip(BANDS, axes)):
-    x, y = a[i][ref], b[i][ref]
+def rma(x, y):
     # Reduced major axis regression: both years are noisy, so don't use ordinary least
     # squares (it assumes x is exact and flattens the slope when x's range is narrow,
     # which happened for NIR: slope 0.52). RMA slope = ratio of spreads.
     slope = np.sign(np.corrcoef(x, y)[0, 1]) * y.std() / x.std()
-    intercept = y.mean() - slope * x.mean()
+    return slope, y.mean() - slope * x.mean()
+
+
+coeffs = {}
+fig, axes = plt.subplots(1, 4, figsize=(18, 4.5))
+for i, (band, ax) in enumerate(zip(BANDS, axes)):
+    x, y = a[i][ref], b[i][ref]
+    slope, intercept = rma(x, y)
     coeffs[band] = (slope, intercept)
     print(f"{band:<5}: 2021 = {slope:.3f} x 2026 {intercept:+.1f}    "
           f"(median before/after on reference: {np.median(y):.0f} / {np.median(x):.0f})")
@@ -75,3 +80,20 @@ n = out.values[:, ::STEP, ::STEP].astype("float32")
 print(f"\nNDVI > 0.61 share   2021: {(ndvi(b) > 0.61).mean():.1%}   "
       f"2026 raw: {(ndvi(a) > 0.61).mean():.1%}   2026 normalized: {(ndvi(n) > 0.61).mean():.1%}")
 print(f"Saved {DATA_DIR / 'composite_after_norm.tif'} and {OUT_DIR / '07_normalization.png'}")
+
+# ---- SWIR bands (Phase 5), same reference pixels ----
+swir_before, swir_after = DATA_DIR / "composite_before_swir.tif", DATA_DIR / "composite_after_swir.tif"
+if swir_before.exists() and swir_after.exists():
+    sa = rioxarray.open_rasterio(swir_after)
+    sb_s = rioxarray.open_rasterio(swir_before).values[:, ::STEP, ::STEP].astype("float32")
+    sa_s = sa.values[:, ::STEP, ::STEP].astype("float32")
+    ok = ref & (sb_s > 0).all(axis=0) & (sa_s > 0).all(axis=0)
+    out = sa.copy()
+    valid = (sa.values > 0).all(axis=0)
+    for i, band in enumerate(["swir1", "swir2"]):
+        slope, intercept = rma(sa_s[i][ok], sb_s[i][ok])
+        print(f"{band}: 2021 = {slope:.3f} x 2026 {intercept:+.1f}")
+        fixed = np.clip(sa.values[i].astype("float32") * slope + intercept, 1, 65535)
+        out.values[i] = np.where(valid, fixed, 0).round().astype("uint16")
+    out.rio.to_raster(DATA_DIR / "composite_after_swir_norm.tif", tiled=True, compress="deflate")
+    print(f"Saved {DATA_DIR / 'composite_after_swir_norm.tif'}")
