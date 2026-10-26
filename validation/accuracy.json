@@ -1,0 +1,58 @@
+{
+ "n_labelled": 300,
+ "n_used": 300,
+ "counts": {
+  "loss": {
+   "cleared": 64,
+   "stayed_forest": 4,
+   "never_forest": 32,
+   "regrew": 0
+  },
+  "gain": {
+   "cleared": 1,
+   "stayed_forest": 6,
+   "never_forest": 29,
+   "regrew": 14
+  },
+  "stable_forest": {
+   "cleared": 3,
+   "stayed_forest": 61,
+   "never_forest": 7,
+   "regrew": 9
+  },
+  "stable_nonforest": {
+   "cleared": 0,
+   "stayed_forest": 2,
+   "never_forest": 67,
+   "regrew": 1
+  }
+ },
+ "precision": {
+  "estimate": 0.64,
+  "ci95": [
+   0.54,
+   0.73
+  ]
+ },
+ "recall": {
+  "estimate": 0.5703096538556136,
+  "ci95": [
+   0.3684685980087917,
+   0.9816553634187103
+  ]
+ },
+ "cleared_ha": {
+  "estimate": 9769.10975,
+  "ci95": [
+   5695.849,
+   14982.571549999999
+  ]
+ },
+ "overall_accuracy": {
+  "estimate": 0.8663294085464261,
+  "ci95": [
+   0.8197270797507945,
+   0.9062467273103411
+  ]
+ }
+}

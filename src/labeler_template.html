@@ -70,7 +70,7 @@
 const POINTS = __POINTS__;
 const LABELS = ["cleared", "stayed_forest", "never_forest", "regrew", "cant_tell"];
 const NAMES = ["Cleared", "Stayed forest", "Never forest", "Regrew", "Can't tell"];
-const KEY = "forest-labels-v1";
+const KEY = "forest-labels-v2";
 let answers = {};
 try { answers = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
 let i = POINTS.findIndex(p => !(p.id in answers));
