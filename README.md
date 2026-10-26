@@ -114,13 +114,38 @@ python src/11_map.py                 # build the interactive map
 python src/13_sample_points.py       # pick 300 random points + labelling page
 # label them in validation/labeler.html, save labels.csv into validation/
 python src/14_accuracy.py            # accuracy and real area from your labels
+
+# the SWIR experiment
+python src/02_composite.py swir      # SWIR bands for both years
+python src/04_tiles.py swir          # 6 band tiles (train in Kaggle, save to models/v2/)
+python src/07_normalize.py           # also matches 2026 SWIR to 2021
+python src/08_predict.py v2
+python src/09_change.py v2
+python src/14_accuracy.py v2
 ```
 
 The trained model is already in `models/best_unet.pt`, so you can skip the training step.
 
+## An experiment that didn't work (and what it taught me)
+
+My hand check showed the model mixing up crops and young bushy regrowth with forest. I had a guess for why: it only sees normal colors and near infrared. Sentinel-2 also measures shortwave infrared (SWIR), which shows how much water is in leaves and soil, so forest canopy looks very different from dry crops and scrub.
+
+So I downloaded the two SWIR bands, added two SWIR indices (NDMI for leaf moisture and NBR for burn scars), and retrained the exact same model on the exact same tiles. Then I scored the new map once on my same 300 points.
+
+| | Without SWIR | With SWIR |
+|---|---|---|
+| IoU against WorldCover (test tiles) | 0.910 | 0.911 |
+| Overall accuracy (my 300 points) | 86.6% | 86.1% |
+| Of what it called cleared, how much really was | 64% | 58% |
+| Of all real clearing, how much it found | 57% | 54% |
+
+SWIR did fix part of what I aimed at: false alarms on crops and regrowth went from 32 to 25 points. But it also lost a few real clearings, and all the differences are well inside the uncertainty ranges. So honestly, no real improvement, and I kept the original model.
+
+What I learned: the model learns whatever its answer key says is forest. WorldCover counts some plantations and bushy regrowth as tree cover, so the model copies that habit no matter how good its inputs are. The thing holding it back is the labels, not the satellite bands. I also stopped here on purpose: if I kept trying new versions against the same 300 points, I would slowly be tuning to my own test, and the numbers would stop meaning anything.
+
 ## What I want to try next
 
-My hand check told me exactly what to fix. Sentinel-2 also takes pictures in shortwave infrared light, which separates crops, bushes and burnt land from real forest much better than normal colors do. Adding those should cut the false alarms. After that I would test the new map on the same 300 points, add more points along forest edges, and try it on other parts of the Amazon to see if it still works there.
+Train with better labels. MapBiomas, a Brazilian project, maps land cover every year and separates natural forest from plantations, pasture and young regrowth. Training on that, and checking it on a fresh set of hand labelled points, is the real test of my idea. I would also like to try it on other parts of the Amazon to see if it still works there.
 
 ## Built with
 
